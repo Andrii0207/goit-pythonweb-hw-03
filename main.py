@@ -1,8 +1,9 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import urllib.parse
-from mimetypes import guess_type
-from pathlib import Path
 import mimetypes
+from pathlib import Path
+import json
+import datetime
 
 BASE_DIR = Path(__file__).parent
 
@@ -22,7 +23,27 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                     self.send_html("error.html", 404)
 
     def do_POST(self):  # noqa
-        pass
+        size = self.headers.get("Content-Length")
+        body = self.rfile.read(int(size)).decode("utf-8")
+        parse_body = urllib.parse.unquote_plus(body)
+        r = parse_body.split("&")
+        form_data = {item.split("=")[0].strip(): item.split("=")[1].strip() for item in r}
+        now = datetime.datetime.now()
+        str_now = now.strftime("%Y-%m-%d %H:%M:%S.%f")
+        time_form_data = {str_now: form_data}
+        try:
+            with open("storage/data.json", "r", encoding="utf-8") as file:
+                loaded_data = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            loaded_data = {}
+        loaded_data.update(time_form_data)
+
+        with open(record_file_name, "w", encoding="utf-8") as file:
+            json.dump(loaded_data, file, ensure_ascii=False, indent=4)
+
+        self.send_response(302)
+        self.send_header("Location", "message.html")
+        self.end_headers()
 
     def send_html(self, filename, status=200):
         self.send_response(status)
@@ -43,6 +64,8 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(file.read())
 
 
+
+record_file_name = "storage/data.json"
 
 
 def run():
