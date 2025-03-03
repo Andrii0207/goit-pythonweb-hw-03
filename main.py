@@ -5,7 +5,11 @@ from pathlib import Path
 import json
 import datetime
 
+from jinja2 import Environment, FileSystemLoader
+
+record_file_name = "storage/data.json"
 BASE_DIR = Path(__file__).parent
+env = Environment(loader=FileSystemLoader("templates"))
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self): # noqa
@@ -15,6 +19,8 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_html("index.html")
             case "/message.html":
                 self.send_html("message.html")
+            case "/read":
+                self.render_template("report.jinja")
             case _:
                 file = BASE_DIR.joinpath(route.path[1:])
                 if file.exists():
@@ -32,7 +38,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         str_now = now.strftime("%Y-%m-%d %H:%M:%S.%f")
         time_form_data = {str_now: form_data}
         try:
-            with open("storage/data.json", "r", encoding="utf-8") as file:
+            with open(record_file_name, "r", encoding="utf-8") as file:
                 loaded_data = json.load(file)
         except (FileNotFoundError, json.JSONDecodeError):
             loaded_data = {}
@@ -52,6 +58,20 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         with open(filename, "rb") as file:
             self.wfile.write(file.read())
 
+    def render_template(self, filename, status=200):
+        self.send_response(status)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        try:
+            with open(record_file_name, "r", encoding="utf-8") as file:
+                data = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = {}
+
+        template = env.get_template(filename)
+        content = template.render(post_list=data)
+        self.wfile.write(content.encode())
+
     def send_static(self, filename, status=200):
         self.send_response(status)
         mime_type, *_ = mimetypes.guess_type(filename)
@@ -65,7 +85,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 
-record_file_name = "storage/data.json"
+
 
 
 def run():
